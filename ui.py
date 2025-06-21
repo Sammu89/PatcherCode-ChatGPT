@@ -1,6 +1,8 @@
 """
 Módulo de interface de utilizador
+
 Gere interações com o utilizador e apresentação de informações
+
 Inclui suporte para correção de indentação Python
 """
 
@@ -33,13 +35,13 @@ class UserInterface:
         Returns:
             Path do ficheiro ou None se cancelado
         """
-        print(f"{self.BOLD}=== Aplicador de Patches Python ==={self.RESET}")
-        print("Suporta: unified diff, âncoras explícitas e implícitas")
-        print("Com correção automática de indentação Python\n")
+        print(f"{self.BOLD}=== Python Patch Applier ==={self.RESET}")
+        print("Supports: unified diff, explicit anchors and implicit anchors")
+        print("With automatic Python indentation correction\n")
         
         while True:
             try:
-                path_input = input("Caminho do ficheiro-alvo ou diretório base (ou 'q' para sair): ").strip()
+                path_input = input("Target file path or base directory (or 'q' to quit): ").strip()
                 
                 if path_input.lower() in ['q', 'quit', 'exit']:
                     return None
@@ -48,10 +50,10 @@ class UserInterface:
                 if file_path:
                     return file_path
                 
-                print(f"{self.RED}Por favor, insira um caminho válido.{self.RESET}\n")
+                print(f"{self.RED}Please enter a valid path.{self.RESET}\n")
                 
             except KeyboardInterrupt:
-                print(f"\n{self.YELLOW}Operação cancelada.{self.RESET}")
+                print(f"\n{self.YELLOW}Operation canceled.{self.RESET}")
                 return None
     
     def get_patch_content(self, target_dir: Path) -> Optional[str]:
@@ -64,13 +66,13 @@ class UserInterface:
         Returns:
             Conteúdo do patch ou None se cancelado
         """
-        print(f"\n{self.BOLD}Como deseja fornecer o patch?{self.RESET}")
+        print(f"\n{self.BOLD}How do you want to provide the patch?{self.RESET}")
         print("1. Colar patch diretamente")
         print("2. Selecionar ficheiro .diff")
         
         while True:
             try:
-                choice = input("\nEscolha (1/2 ou 'q' para sair): ").strip()
+                choice = input("\nChoose (1/2 or 'q' to quit): ").strip()
                 
                 if choice.lower() in ['q', 'quit', 'exit']:
                     return None
@@ -80,27 +82,27 @@ class UserInterface:
                 elif choice == '2':
                     return self._get_patch_from_file(target_dir)
                 else:
-                    print(f"{self.RED}Escolha inválida. Use 1, 2 ou 'q'.{self.RESET}")
+                    print(f"{self.RED}Invalid choice. Use 1, 2 or 'q'.{self.RESET}")
                     
             except KeyboardInterrupt:
-                print(f"\n{self.YELLOW}Operação cancelada.{self.RESET}")
+                print(f"\n{self.YELLOW}Operation canceled.{self.RESET}")
                 return None
     
     def _get_pasted_patch(self) -> Optional[str]:
         """Obtém patch colado pelo utilizador"""
-        print(f"\n{self.BOLD}Cole o patch abaixo (termine com 'END' numa linha separada):{self.RESET}")
+        print(f"\n{self.BOLD}Paste the patch below (finish input with Ctrl+D):{self.RESET}")
         
         try:
             patch_content = self.io_handler.read_patch_from_stdin()
             
             if not patch_content.strip():
-                print(f"{self.RED}Patch vazio fornecido.{self.RESET}")
+                print(f"{self.RED}Empty patch provided.{self.RESET}")
                 return None
             
             return patch_content
             
         except KeyboardInterrupt:
-            print(f"\n{self.YELLOW}Entrada de patch cancelada.{self.RESET}")
+            print(f"\n{self.YELLOW}Patch input canceled.{self.RESET}")
             return None
     
     def _get_patch_from_file(self, target_dir: Path) -> Optional[str]:
@@ -108,16 +110,16 @@ class UserInterface:
         diff_files = self.io_handler.list_diff_files(target_dir)
         
         if not diff_files:
-            print(f"{self.YELLOW}Nenhum ficheiro .diff encontrado em: {target_dir}{self.RESET}")
+            print(f"{self.YELLOW}No .diff file found in: {target_dir}{self.RESET}")
             return None
         
-        print(f"\n{self.BOLD}Ficheiros .diff encontrados:{self.RESET}")
+        print(f"\n{self.BOLD}Found .diff files:{self.RESET}")
         for i, diff_file in enumerate(diff_files, 1):
             print(f"{i}. {diff_file.name}")
         
         while True:
             try:
-                choice = input(f"\nEscolha o ficheiro (1-{len(diff_files)} ou 'q' para voltar): ").strip()
+                choice = input(f"\nChoose a file (1-{len(diff_files)} or 'q' to go back): ").strip()
                 
                 if choice.lower() in ['q', 'quit', 'back']:
                     return None
@@ -129,18 +131,18 @@ class UserInterface:
                         patch_content = self.io_handler.read_patch_file(selected_file)
                         
                         if patch_content is None:
-                            print(f"{self.RED}Erro ao ler o ficheiro selecionado.{self.RESET}")
+                            print(f"{self.RED}Error reading selected file.{self.RESET}")
                             continue
                         
-                        print(f"{self.GREEN}Ficheiro carregado: {selected_file.name}{self.RESET}")
+                        print(f"{self.GREEN}File loaded: {selected_file.name}{self.RESET}")
                         return patch_content
                     else:
-                        print(f"{self.RED}Número inválido. Escolha entre 1 e {len(diff_files)}.{self.RESET}")
+                        print(f"{self.RED}Invalid number. Choose between 1 and {len(diff_files)}.{self.RESET}")
                 except ValueError:
-                    print(f"{self.RED}Por favor, insira um número válido.{self.RESET}")
+                    print(f"{self.RED}Please enter a valid number.{self.RESET}")
                     
             except KeyboardInterrupt:
-                print(f"\n{self.YELLOW}Seleção cancelada.{self.RESET}")
+                print(f"\n{self.YELLOW}Selection canceled.{self.RESET}")
                 return None
     
     def disambiguate_anchor(self, content: List[str], anchor: str, matches: List[int], context_lines: int) -> Optional[int]:
@@ -156,7 +158,7 @@ class UserInterface:
         Returns:
             Índice escolhido ou None se cancelado
         """
-        print(f"\n{self.YELLOW}Múltiplas ocorrências encontradas para a âncora:{self.RESET}")
+        print(f"\n{self.YELLOW}Multiple occurrences found for anchor:{self.RESET}")
         print(f"{self.BLUE}{anchor}{self.RESET}\n")
         
         # Mostrar opções com contexto
@@ -182,12 +184,12 @@ class UserInterface:
         # Solicitar escolha
         while True:
             try:
-                choice = input(f"Escolha a ocorrência (1-{len(matches)}, 's' para pular, 'q' para cancelar): ").strip().lower()
+                choice = input(f"Choose occurrence (1-{len(matches)}, 's' to skip, 'q' to cancel): ").strip().lower()
                 
                 if choice in ['q', 'quit', 'cancel']:
                     return None
                 elif choice in ['s', 'skip']:
-                    print(f"{self.YELLOW}Hunk pulado pelo utilizador.{self.RESET}")
+                    print(f"{self.YELLOW}Hunk skipped by user.{self.RESET}")
                     return None
                 
                 try:
@@ -199,10 +201,10 @@ class UserInterface:
                     else:
                         print(f"{self.RED}Número inválido. Escolha entre 1 e {len(matches)}.{self.RESET}")
                 except ValueError:
-                    print(f"{self.RED}Entrada inválida. Use um número, 's' ou 'q'.{self.RESET}")
+                    print(f"{self.RED}Invalid input. Use a number, 's', or 'q'.{self.RESET}")
                     
             except KeyboardInterrupt:
-                print(f"\n{self.YELLOW}Desambiguação cancelada.{self.RESET}")
+                print(f"\n{self.YELLOW}Disambiguation canceled.{self.RESET}")
                 return None
     
     def confirm_indentation_fix(self) -> bool:
