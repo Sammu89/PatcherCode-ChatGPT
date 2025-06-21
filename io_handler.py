@@ -84,8 +84,9 @@ class IOHandler:
             Caminho do backup ou None em caso de erro
         """
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = file_path.with_suffix(f'.bak_{timestamp}')
+            timestamp = datetime.now().strftime("%d%m%y_%H%M")
+            backup_name = f"{file_path.stem}_{timestamp}.bak"
+            backup_path = file_path.parent / backup_name
             
             shutil.copy2(file_path, backup_path)
             return backup_path
@@ -196,8 +197,10 @@ class IOHandler:
                 print(f"Erro: Ficheiro não existe: {path}")
                 return None
             
+            if path.is_dir():
+                return path
             if not path.is_file():
-                print(f"Erro: Caminho não é um ficheiro: {path}")
+                print(f"Erro: Caminho não é um ficheiro ou diretório válido: {path}")
                 return None
             
             return path

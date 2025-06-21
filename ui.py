@@ -39,7 +39,7 @@ class UserInterface:
         
         while True:
             try:
-                path_input = input("Caminho do ficheiro-alvo (ou 'q' para sair): ").strip()
+                path_input = input("Caminho do ficheiro-alvo ou diretório base (ou 'q' para sair): ").strip()
                 
                 if path_input.lower() in ['q', 'quit', 'exit']:
                     return None

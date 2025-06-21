@@ -31,6 +31,7 @@ class Hunk:
     
     # Para âncoras
     anchor: Optional[str] = None
+    file_path: Optional[str] = None
 
 
 class PatchParser:
@@ -54,12 +55,26 @@ class PatchParser:
         lines = patch_content.splitlines()
         hunks = []
         i = 0
+        old_file = None
+        current_file = None
         
         while i < len(lines):
             line = lines[i]
             
             # Pular linhas de cabeçalho de ficheiro (--- e +++)
-            if line.startswith('---') or line.startswith('+++'):
+            if line.startswith('--- '):
+                old_file_line = line[4:]
+                if old_file_line.startswith('a/'):
+                    old_file_line = old_file_line[2:]
+                old_file = None if old_file_line.strip() == '/dev/null' else old_file_line
+                i += 1
+                continue
+            if line.startswith('+++ '):
+                new_file_line = line[4:]
+                if new_file_line.startswith('b/'):
+                    new_file_line = new_file_line[2:]
+                new_file = None if new_file_line.strip() == '/dev/null' else new_file_line
+                current_file = old_file if new_file is None else new_file
                 i += 1
                 continue
             
@@ -67,6 +82,7 @@ class PatchParser:
             if line.startswith('@@'):
                 hunk, next_i = self._parse_hunk(lines, i)
                 if hunk:
+                    hunk.file_path = current_file
                     hunks.append(hunk)
                 i = next_i
             else:

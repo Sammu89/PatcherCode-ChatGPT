@@ -7,6 +7,8 @@ desktop.ini
 *.tmp 
 *.temp 
 *.log 
+*.bak
+*.diff
  
 # Dependency folders 
 node_modules/ 

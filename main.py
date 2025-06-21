@@ -8,6 +8,7 @@ Com correção automática de indentação para ficheiros Python
 import sys
 import argparse
 from pathlib import Path
+from datetime import datetime
 
 from io_handler import IOHandler
 from parser_handler import PatchParser
@@ -39,15 +40,18 @@ class PatchApplication:
             if not target_file:
                 return 1
                 
-            original_content = self.io_handler.read_target_file(target_file)
-            if original_content is None:
-                self.ui.show_error(f"Erro ao ler o ficheiro: {target_file}")
-                return 1
-                
-            self.logger.log_event("FILE_READ", f"Ficheiro lido: {target_file}")
+            if target_file.is_dir():
+                root_dir = target_file
+            else:
+                root_dir = target_file.parent
+                original_content = self.io_handler.read_target_file(target_file)
+                if original_content is None:
+                    self.ui.show_error(f"Erro ao ler o ficheiro: {target_file}")
+                    return 1
+                self.logger.log_event("FILE_READ", f"Ficheiro lido: {target_file}")
             
             # 2. Leitura do patch
-            patch_content = self.ui.get_patch_content(target_file.parent)
+            patch_content = self.ui.get_patch_content(root_dir)
             if not patch_content:
                 return 1
                 
@@ -60,10 +64,90 @@ class PatchApplication:
             self.logger.log_event("PATCH_PARSED", f"Encontrados {len(hunks)} hunks")
             
             # 4. Aplicação dos hunks
-            modified_content, results = self.applier.apply_hunks(
-                original_content, hunks, self.ui
-            )
-            
+            if target_file.is_dir():
+                results = {'applied': 0, 'failed': 0, 'warnings': []}
+                indentation_warnings_all = []
+                file_hunks = {}
+                for hunk in hunks:
+                    file_path = hunk.file_path
+                    if not file_path:
+                        self.ui.show_error("Patch inválido: falta caminho de ficheiro para hunk.")
+                        return 1
+                    file_hunks.setdefault(file_path, []).append(hunk)
+                updated_contents = {}
+                for file_rel, hunks_list in file_hunks.items():
+                    file_path = root_dir / file_rel
+                    original_content_file = self.io_handler.read_target_file(file_path)
+                    if original_content_file is None:
+                        self.ui.show_error(f"Erro ao ler o ficheiro: {file_path}")
+                        results['failed'] += len(hunks_list)
+                        results['warnings'].append(f"Ficheiro não encontrado ou inacessível: {file_rel}")
+                        continue
+                    self.ui.show_info(f"Aplicando patch no ficheiro: {file_path}")
+                    modified_content_file, res_file = self.applier.apply_hunks(original_content_file, hunks_list, self.ui)
+                    # Garantir que modified_content_file é string para análise de indentação
+                    if isinstance(modified_content_file, list):
+                        modified_content_file = "\n".join(modified_content_file)
+                    results['applied'] += res_file.get('applied', 0)
+                    results['failed'] += res_file.get('failed', 0)
+                    for w in res_file.get('warnings', []):
+                        results['warnings'].append(f"{file_rel}: {w}")
+                    file_indent_warnings = []
+                    if self.fix_indentation and res_file.get('applied', 0) > 0:
+                        if self.indentation_corrector.is_python_file(file_path):
+                            self.ui.show_info("🐍 Ficheiro Python detectado - verificando indentação...")
+                            analysis = self.indentation_corrector.analyze_indentation_issues(modified_content_file)
+                            analysis_summary = self.indentation_corrector.get_correction_summary(analysis)
+                            if (analysis['has_tabs'] and analysis['has_spaces']) or analysis['mixed_lines'] or analysis['inconsistent_spacing']:
+                                self.ui.show_info("Problemas de indentação detectados:")
+                                print(analysis_summary)
+                                if self.ui.confirm_indentation_fix():
+                                    corrected_content_file, warnings_file, was_modified_file = self.indentation_corrector.correct_file_indentation(modified_content_file, file_path)
+                                    if was_modified_file:
+                                        modified_content_file = corrected_content_file
+                                        file_indent_warnings = warnings_file
+                                        self.ui.show_success("✅ Indentação corrigida")
+                                        self.logger.log_event("INDENTATION_CORRECTED", f"{file_rel}: Avisos: {'; '.join(warnings_file)}")
+                                    else:
+                                        if warnings_file:
+                                            self.ui.show_warning(f"Correção de indentação falhou no ficheiro {file_rel} - veja avisos.")
+                                            file_indent_warnings.extend(warnings_file)
+                                        else:
+                                            self.ui.show_info("Nenhuma correção de indentação necessária")
+                                else:
+                                    self.ui.show_info("Correção de indentação ignorada")
+                            else:
+                                self.ui.show_success("✅ Indentação já está consistente")
+                                self.logger.log_event("INDENTATION_CHECK", f"{file_rel}: Indentação consistente")
+                    for w in file_indent_warnings:
+                        indentation_warnings_all.append(f"{file_rel}: {w}")
+                    updated_contents[file_path] = modified_content_file
+                self.ui.show_summary(results, indentation_warnings_all)
+                if results['applied'] > 0:
+                    if self.ui.confirm_save():
+                        for path, content in updated_contents.items():
+                            backup_path = self.io_handler.create_backup(path)
+                            if backup_path:
+                                self.logger.log_event("BACKUP_CREATED", str(backup_path))
+                            if self.io_handler.write_target_file(path, content):
+                                self.ui.show_success(f"Ficheiro atualizado: {path}")
+                                self.logger.log_event("FILE_SAVED", str(path))
+                            else:
+                                self.ui.show_error(f"Erro ao gravar o ficheiro: {path}")
+                                return 1
+                    else:
+                        self.ui.show_info("Alterações descartadas")
+                        self.logger.log_event("CHANGES_DISCARDED", "")
+                else:
+                    self.ui.show_info("Nenhuma alteração foi aplicada")
+                return 0
+            else:
+                modified_content, results = self.applier.apply_hunks(
+                    original_content, hunks, self.ui
+                )
+                # Garantir que modified_content é string para análise de indentação
+                if isinstance(modified_content, list):
+                    modified_content = "\n".join(modified_content)
             # 5. Correção de indentação (se habilitada e há mudanças)
             indentation_warnings = []
             if self.fix_indentation and results['applied'] > 0:
@@ -89,7 +173,11 @@ class PatchApplication:
                                 self.ui.show_success("✅ Indentação corrigida")
                                 self.logger.log_event("INDENTATION_CORRECTED", f"Avisos: {'; '.join(warnings)}")
                             else:
-                                self.ui.show_info("Nenhuma correção de indentação necessária")
+                                if warnings:
+                                    self.ui.show_warning("Correção de indentação falhou ou não foi aplicada - veja avisos.")
+                                    indentation_warnings = warnings
+                                else:
+                                    self.ui.show_info("Nenhuma correção de indentação necessária")
                         else:
                             self.ui.show_info("Correção de indentação ignorada")
                     else:
