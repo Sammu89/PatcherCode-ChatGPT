@@ -29,14 +29,26 @@ if errorlevel 1 (
 )
 
 REM Check if it's already a Git repository
+echo Checking if this is a Git repository...
 git rev-parse --git-dir >nul 2>&1
 if errorlevel 1 (
-    echo.
     echo This folder is not a Git repository.
     echo.
     set /p create_repo="Do you want to create a new repository? (y/n): "
     
     if /i "!create_repo!"=="y" (
+        goto create_new_repo
+    ) else (
+        echo Operation cancelled.
+        pause
+        exit /b 0
+    )
+) else (
+    echo This is already a Git repository.
+    goto check_remote
+)
+
+:create_new_repo
         echo.
         set /p repo_name="Repository name (no spaces): "
         
@@ -123,6 +135,11 @@ if errorlevel 1 (
         echo *.temp >> .gitignore
         echo *.log >> .gitignore
         echo. >> .gitignore
+        echo # Python >> .gitignore
+        echo __pycache__/ >> .gitignore
+        echo *.pyc >> .gitignore
+        echo *.pyo >> .gitignore
+        echo. >> .gitignore
         echo # Dependency folders >> .gitignore
         echo node_modules/ >> .gitignore
         echo vendor/ >> .gitignore
@@ -171,12 +188,15 @@ if errorlevel 1 (
         echo Repository configured successfully!
         echo Remote: !remote_url!
         echo.
+        goto check_remote
     ) else (
         echo Operation cancelled.
         pause
         exit /b 0
     )
 )
+
+:check_remote
 
 REM Check if there's a remote configured
 git remote get-url origin >nul 2>&1
@@ -200,6 +220,11 @@ echo.
 echo Adding files...
 git add .
 
+REM Debug: Show status
+echo.
+echo Git status:
+git status --porcelain
+
 REM Check if there are any changes at all (staged or unstaged)
 git diff --quiet && git diff --cached --quiet
 if not errorlevel 1 (
@@ -208,6 +233,16 @@ if not errorlevel 1 (
     echo   No changes detected.
     echo   Repository is up to date!
     echo ================================
+    echo.
+    echo Debug info:
+    echo Current branch: 
+    git branch --show-current
+    echo.
+    echo Remote status:
+    git remote -v
+    echo.
+    echo Last commit:
+    git log --oneline -1
     pause
     exit /b 0
 )
@@ -238,16 +273,24 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if it's the first push
-git rev-parse --verify origin/main >nul 2>&1
+REM Check if it's the first push and get current branch name
+for /f "delims=" %%i in ('git branch --show-current') do set current_branch=%%i
+
+REM If no current branch name (old Git versions), default to master
+if "!current_branch!"=="" (
+    for /f "tokens=2" %%i in ('git branch') do set current_branch=%%i
+)
+
+REM Try to check if remote branch exists
+git rev-parse --verify origin/!current_branch! >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo Making first push...
-    git push -u origin main
+    echo Making first push to !current_branch! branch...
+    git push -u origin !current_branch!
 ) else (
     echo.
-    echo Pushing to repository...
-    git push origin main
+    echo Pushing to !current_branch! branch...
+    git push origin !current_branch!
 )
 
 if errorlevel 1 (
